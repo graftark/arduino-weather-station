@@ -1,7 +1,11 @@
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 #include <SPI.h>
-#include <DHT.h>
+#include "DHT.h"
+#include <nRF24L01.h>
+#include <printf.h>
+#include <RF24.h>
+#include <RF24_config.h>
 
 #define DHTPIN 2
 #define DHTTYPE DHT11
@@ -15,12 +19,24 @@ float Am=0;
 float Af=0;
 
 //vars for dht
-float d_temp=0;
-float d_hum=0;
+float d_temp;
+float d_hum;
 
 Adafruit_BMP085 bmp;
 DHT dht(DHTPIN, DHTTYPE);
+//Set up radio
+RF24 radio(9,10);
+// Topology
+// Radio pipe address for the 2 nodes to communicate.
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0XF0F0F0F0D2LL };
 
+// ROLES 
+typedef enum { role_sender = 1, role_receiver } role_e;
+// debug friendly role names
+const char* role_friendly_name[] = { "invalid","Sender","Receiver" };
+// default role
+role_e role = role_receiver;
+  
 void setup() {
   // Initialize Serial Comm
   Serial.begin(9600);
@@ -31,6 +47,7 @@ void setup() {
   }
   // Initialize DHT
   dht.begin();
+
 }
 
 void loop() {
@@ -62,12 +79,26 @@ void loop() {
   if(isnan(d_temp)||isnan(d_hum)){
     Serial.println("DHT read failure");
   }else{
+  d_temp = dht.readTemperature(true);
+  d_hum = dht.readHumidity();
+  
+  float d_hi = dht.computeHeatIndex(d_temp,d_hum);
+  float x_hi = dht.computeHeatIndex(tempF,d_hum);
+  
   String h1 = "Humidity: ";
   String h2 = h1 + d_hum;
+  String h3 = h2 + " %\t ";
   String t1 = nl + "Temp from DHT: ";
   String t2 = t1 + d_temp;
-  String t3 = t2 + " in *C" + nl;
-  Serial.print(h2 + t3);
+  String t3 = t2 + " in *F" + nl;
+  String i1 = "Heat Index: ";
+  String i2 = i1 + d_hi;
+  String i3 = i2 + " *F" + nl;
+  String x1 = "Heat Index using BMP Temp: ";
+  String x2 = x1 + x_hi;
+  String x3 = x2 + " *F" + nl;
+  
+  Serial.print(h3 + t3 + i3 + x3);
   }
   Serial.print(nl);
   delay(1000);
