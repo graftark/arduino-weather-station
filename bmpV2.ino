@@ -25,21 +25,14 @@ float d_hum;
 Adafruit_BMP085 bmp;
 DHT dht(DHTPIN, DHTTYPE);
 //Set up radio
-RF24 radio(9,10);
+RF24 radio(8,10);
 // Topology
 // Radio pipe address for the 2 nodes to communicate.
-const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0XF0F0F0F0D2LL };
-
-// ROLES 
-typedef enum { role_sender = 1, role_receiver } role_e;
-// debug friendly role names
-const char* role_friendly_name[] = { "invalid","Sender","Receiver" };
-// default role
-role_e role = role_receiver;
+const uint64_t pipes[2] = { 0xf0f0f0f0d2LL, 0xf0f0f0f0e1LL };
   
 void setup() {
   // Initialize Serial Comm
-  Serial.begin(9600);
+  Serial.begin(57600);
   // Initialize BMP
   if (!bmp.begin()) {
     Serial.println("Could not find a valid BMP085 sensor, check wiring!");
@@ -47,11 +40,24 @@ void setup() {
   }
   // Initialize DHT
   dht.begin();
-
+  
+  /*************
+   * nRF setup *
+   *************/
+ //CONFIGURE RADIO
+  radio.begin();
+  radio.setRetries(15,15);
+//  radio.setPayloadSize(32);
+  // Enable this seems to work better
+  radio.openWritingPipe(pipes[0]);
+  radio.openReadingPipe(1,pipes[1]);
+  radio.startListening();
+  radio.printDetails();
 }
 
 void loop() {
   // Add new lines easy
+  String output = "";
   String nl = "\n";
   /*************************
    * Code for BMP180       *
@@ -97,9 +103,21 @@ void loop() {
   String x1 = "Heat Index using BMP Temp: ";
   String x2 = x1 + x_hi;
   String x3 = x2 + " *F" + nl;
-  
-  Serial.print(h3 + t3 + i3 + x3);
+  String output = h3 + t3 + i3 + x3;
+  //Serial.print(output);
   }
-  Serial.print(nl);
+  //Serial.print(nl);
+  
+  radio.stopListening();
+  radio.write( &output, sizeof(String) );
+/*  bool ok = radio.write( &output, sizeof(String) );
+
+  if (ok) {
+    printf("Sent data...\n");
+  }
+  else {
+    printf("Failed transmission...\n");
+  }
+*/
   delay(1000);
 }
